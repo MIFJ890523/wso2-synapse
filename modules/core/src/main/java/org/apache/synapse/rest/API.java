@@ -18,6 +18,7 @@
 
 package org.apache.synapse.rest;
 
+import java.util.regex.Pattern;
 import org.apache.axis2.Constants;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,6 +34,8 @@ import org.apache.synapse.aspects.AspectConfiguration;
 import org.apache.synapse.aspects.ComponentType;
 import org.apache.synapse.aspects.flow.statistics.StatisticIdentityGenerator;
 import org.apache.synapse.aspects.flow.statistics.data.artifact.ArtifactHolder;
+import org.apache.synapse.commons.resolvers.ResolverException;
+import org.apache.synapse.commons.resolvers.ResolverFactory;
 import org.apache.synapse.transport.customlogsetter.CustomLogSetter;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
@@ -47,11 +50,12 @@ import org.apache.synapse.transport.http.conn.SynapseWireLogHolder;
 import org.apache.synapse.transport.nhttp.NhttpConstants;
 import org.apache.synapse.transport.passthru.PassThroughConstants;
 import org.apache.synapse.transport.passthru.config.PassThroughConfiguration;
-import org.apache.synapse.transport.passthru.config.SourceConfiguration;
 
 import java.util.*;
 
 public class API extends AbstractRESTProcessor implements ManagedLifecycle, AspectConfigurable, SynapseArtifact {
+
+    private static final String DISABLE_API_TRACING = "$FILE:DISABLE_API_TRACING";
 
     private String host;
     private int port = -1;
@@ -541,6 +545,7 @@ public class API extends AbstractRESTProcessor implements ManagedLifecycle, Aspe
                 ((ManagedLifecycle) handler).init(se);
             }
         }
+        enableTracing();
     }
 
     public void destroy() {
@@ -635,5 +640,18 @@ public class API extends AbstractRESTProcessor implements ManagedLifecycle, Aspe
     @Override
     public String getDescription() {
         return description;
+    }
+
+    private void enableTracing() {
+        try {
+            if (!Arrays.asList(
+                ResolverFactory.getInstance().getResolver(DISABLE_API_TRACING).resolve()
+                    .split(Pattern.quote("|"))).contains(this.name)) {
+                this.aspectConfiguration.enableStatistics();
+                this.aspectConfiguration.enableTracing();
+            }
+        } catch (ResolverException e) {
+            log.warn("File Property variable could not be found: " + DISABLE_API_TRACING);
+        }
     }
 }
