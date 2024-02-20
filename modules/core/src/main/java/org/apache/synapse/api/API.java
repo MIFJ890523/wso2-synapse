@@ -34,6 +34,8 @@ import org.apache.synapse.aspects.ComponentType;
 import org.apache.synapse.aspects.flow.statistics.StatisticIdentityGenerator;
 import org.apache.synapse.aspects.flow.statistics.data.artifact.ArtifactHolder;
 import org.apache.synapse.commons.CorrelationConstants;
+import org.apache.synapse.commons.resolvers.ResolverException;
+import org.apache.synapse.commons.resolvers.ResolverFactory;
 import org.apache.synapse.config.xml.rest.VersionStrategyFactory;
 import org.apache.synapse.core.SynapseEnvironment;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
@@ -61,9 +63,11 @@ import java.util.LinkedHashSet;
 import java.util.Collection;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.regex.Pattern;
 
 public class API extends AbstractRequestProcessor implements ManagedLifecycle, AspectConfigurable, SynapseArtifact {
 
+    private static final String DISABLE_API_TRACING = "$FILE:DISABLE_API_TRACING";
     private String host;
     private int port = -1;
     private String context;
@@ -608,6 +612,7 @@ public class API extends AbstractRequestProcessor implements ManagedLifecycle, A
                 ((ManagedLifecycle) handler).init(se);
             }
         }
+        enableTracing();
     }
 
     private String getFormattedLog(String msg) {
@@ -709,5 +714,18 @@ public class API extends AbstractRequestProcessor implements ManagedLifecycle, A
     @Override
     public String getDescription() {
         return description;
+    }
+
+    private void enableTracing() {
+        try {
+            if (!Arrays.asList(
+                    ResolverFactory.getInstance().getResolver(DISABLE_API_TRACING).resolve()
+                            .split(Pattern.quote("|"))).contains(this.name)) {
+                this.aspectConfiguration.enableStatistics();
+                this.aspectConfiguration.enableTracing();
+            }
+        } catch (ResolverException e) {
+            log.warn("File Property variable could not be found: " + DISABLE_API_TRACING);
+        }
     }
 }
